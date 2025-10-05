@@ -1,427 +1,59 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>WebEngine — Starter</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root{ --bg:#0b0f14; --panel:#0f1720; --muted:#9aa6b2; --accent:#4fc3f7; --glass: rgba(255,255,255,0.03)}
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;color:#e6eef6;background:linear-gradient(180deg,#05060a,#08121a);}
-  .app{display:grid;grid-template-columns:260px 1fr 320px;grid-template-rows:48px 1fr;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
-  header{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-radius:10px;box-shadow:0 6px 20px rgba(2,6,12,.6)}
-  header h1{margin:0;font-size:14px;font-weight:600}
-  .left, .right{background:var(--panel);border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(2,6,12,.5);overflow:auto}
-  .center{position:relative;border-radius:10px;overflow:hidden;background:var(--glass);box-shadow:0 6px 30px rgba(2,6,12,.6)}
-  .panel-title{font-size:12px;color:var(--muted);margin-bottom:8px}
-  button{background:#0b2834;border:none;color:#dff6ff;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600}
-  .row{display:flex;gap:8px;margin-bottom:8px}
-  #viewport{width:100%;height:calc(100vh - 96px);display:block}
-  .inspector input{width:100%;padding:6px;border-radius:6px;border:none;background:rgba(255,255,255,0.02);color:#eaf6ff}
-  .object-item{padding:6px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.02);cursor:pointer}
-  .object-item.selected{outline:2px solid rgba(79,195,247,.16)}
-  .top-controls{display:flex;gap:8px;margin-left:auto}
-  .small{font-size:12px;padding:6px 8px}
-  .muted{color:var(--muted);font-size:12px}
-  .footer-stats{position:absolute;left:12px;bottom:12px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;color:#dff6ff;font-weight:600}
-  input[type="file"]{display:none}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebEngine — Starter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>WebEngine — Starter</h1>
-    <div class="top-controls">
-      <button id="btnPlay" class="small">Play</button>
-      <button id="btnPause" class="small">Pause</button>
-      <button id="btnStop" class="small">Stop</button>
-      <button id="btnAddCube" class="small">Add Cube</button>
-      <button id="btnAddSphere" class="small">Add Sphere</button>
-      <button id="btnAddLight" class="small">Add Light</button>
-      <button id="btnSave" class="small">Save Scene</button>
-      <label class="small" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-        <input id="fileLoad" type="file" accept="application/json"/>
-        <span class="small muted">Load Scene</span>
-      </label>
-      <label title="Upload Texture" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-        <input id="texUpload" type="file" accept="image/*"/>
-        <span class="small muted">Upload Tex</span>
-      </label>
-    </div>
-  </header>
+  <div class="app">
+    <header>
+      <h1>WebEngine — Starter</h1>
+      <div class="top-controls">
+        <button id="btnPlay" class="small">Play</button>
+        <button id="btnPause" class="small">Pause</button>
+        <button id="btnStop" class="small">Stop</button>
+        <button id="btnAddCube" class="small">Add Cube</button>
+        <button id="btnAddSphere" class="small">Add Sphere</button>
+        <button id="btnAddLight" class="small">Add Light</button>
+        <button id="btnSave" class="small">Save Scene</button>
+        <label class="small" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+          <input id="fileLoad" type="file" accept="application/json"/>
+          <span class="small muted">Load Scene</span>
+        </label>
+        <label title="Upload Texture" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+          <input id="texUpload" type="file" accept="image/*"/>
+          <span class="small muted">Upload Tex</span>
+        </label>
+      </div>
+    </header>
 
-  <aside class="left">
-    <div class="panel-title">Hierarchy</div>
-    <div id="hierarchy"></div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
-    <div class="panel-title">Assets</div>
-    <div id="assets"></div>
-  </aside>
+    <aside class="left">
+      <div class="panel-title">Hierarchy</div>
+      <div id="hierarchy"></div>
+      <hr>
+      <div class="panel-title">Assets</div>
+      <div id="assets"></div>
+    </aside>
 
-  <main class="center">
-    <canvas id="viewport"></canvas>
-    <div class="footer-stats" id="stats">FPS: --</div>
-  </main>
+    <main class="center">
+      <canvas id="viewport"></canvas>
+      <div class="footer-stats" id="stats">FPS: --</div>
+    </main>
 
-  <aside class="right">
-    <div class="panel-title">Inspector</div>
-    <div id="inspector" class="inspector">
-      <div class="muted">Select an object to edit</div>
-    </div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
-    <div class="panel-title">Console</div>
-    <div id="console" style="height:200px;overflow:auto;color:#cfeffd;font-size:13px"></div>
-  </aside>
-</div>
+    <aside class="right">
+      <div class="panel-title">Inspector</div>
+      <div id="inspector" class="inspector">
+        <div class="muted">Select an object to edit</div>
+      </div>
+      <hr>
+      <div class="panel-title">Console</div>
+      <div id="console"></div>
+    </aside>
+  </div>
 
-<!-- Three.js from CDN + OrbitControls -->
-<script type="module">
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-
-//// Minimal engine core ////
-const canvas = document.getElementById('viewport');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setClearColor(0x08121a);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
-
-const scene = new THREE.Scene();
-scene.userData = { engine: true }; // marker
-
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
-camera.position.set(6,4,6);
-const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.enableDamping = true;
-
-const root = new THREE.Group();
-scene.add(root);
-
-//// Basic environment ////
-const hemi = new THREE.HemisphereLight(0xaaaaee, 0x222222, 0.6);
-scene.add(hemi);
-const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-dir.position.set(5,10,7);
-dir.castShadow = true;
-scene.add(dir);
-
-const grid = new THREE.GridHelper(50,50,'#24303a','#182126');
-grid.material.opacity = 0.2; grid.material.transparent = true;
-scene.add(grid);
-
-//// Simple physics (integrator) ////
-const physicsObjects = new Set();
-let gravity = new THREE.Vector3(0,-9.81,0);
-let running = false;
-let lastTime = performance.now();
-
-function enablePhysicsFor(obj, mass=1){
-  obj.userData.rigid = { mass: mass, velocity: new THREE.Vector3(), onGround:false };
-  physicsObjects.add(obj);
-}
-
-function stepPhysics(dt){
-  // simple Euler integrator + ground collision with plane y=0
-  physicsObjects.forEach(obj=>{
-    const r = obj.userData.rigid;
-    if(!r) return;
-    // integrate
-    const acc = gravity.clone().multiplyScalar(1); // constant g
-    r.velocity.addScaledVector(acc, dt);
-    obj.position.addScaledVector(r.velocity, dt);
-
-    // ground collision
-    if(obj.position.y - (obj.userData.halfHeight||0.5) < 0){
-      obj.position.y = (obj.userData.halfHeight||0.5);
-      if(r.velocity.y < 0) r.velocity.y = -r.velocity.y * 0.3; // bounce damping
-      // near-zero => stop
-      if(Math.abs(r.velocity.y) < 0.01) r.velocity.y = 0;
-    }
-  });
-}
-
-//// Selection & basic transform (translate only) ////
-const ray = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let selected = null;
-let isDragging = false;
-let dragStart = null;
-let plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
-
-function raycastFromPointer(evt){
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((evt.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((evt.clientY - rect.top) / rect.height) * 2 + 1;
-  ray.setFromCamera(mouse, camera);
-  const intersects = ray.intersectObjects(root.children, true).filter(i=>i.object.userData.pickable !== false);
-  return intersects;
-}
-
-renderer.domElement.addEventListener('pointerdown', (e)=>{
-  if(e.button !== 0) return;
-  const hits = raycastFromPointer(e);
-  if(hits.length){
-    const obj = hits[0].object.userData.root || hits[0].object;
-    selectObject(obj);
-    // prepare dragging on ground plane
-    const hitPoint = hits[0].point;
-    plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), hitPoint);
-    dragStart = hitPoint;
-    isDragging = true;
-  } else {
-    selectObject(null);
-  }
-});
-window.addEventListener('pointermove', (e)=>{
-  if(isDragging && selected){
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    ray.setFromCamera(mouse, camera);
-    const p = new THREE.Vector3();
-    ray.ray.intersectPlane(plane, p);
-    if(p && dragStart){
-      const delta = p.clone().sub(dragStart);
-      selected.position.add(delta);
-      dragStart.copy(p);
-      updateInspector(); updateHierarchy();
-    }
-  }
-});
-window.addEventListener('pointerup', ()=> { isDragging = false; dragStart = null; });
-
-//// Scene management helpers ////
-const hierarchyEl = document.getElementById('hierarchy');
-const inspectorEl = document.getElementById('inspector');
-const assetsEl = document.getElementById('assets');
-const consoleEl = document.getElementById('console');
-const statsEl = document.getElementById('stats');
-
-function log(...args){ const s = args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' '); const p = document.createElement('div'); p.textContent = s; consoleEl.prepend(p); }
-
-function addToHierarchy(obj){
-  obj.userData.root = obj;
-  const id = obj.uuid;
-  const el = document.createElement('div');
-  el.className = 'object-item';
-  el.id = 'obj-'+id;
-  el.textContent = obj.name || obj.type;
-  el.onclick = ()=> selectObject(obj);
-  hierarchyEl.prepend(el);
-}
-
-function removeFromHierarchy(obj){
-  const el = document.getElementById('obj-'+obj.uuid);
-  if(el) el.remove();
-}
-
-function updateHierarchy(){
-  Array.from(hierarchyEl.children).forEach(c=>c.classList.remove('selected'));
-  if(selected){
-    const el = document.getElementById('obj-'+selected.uuid);
-    if(el) el.classList.add('selected');
-  }
-}
-
-function selectObject(obj){
-  selected = obj;
-  updateHierarchy();
-  renderInspector();
-}
-
-function renderInspector(){
-  inspectorEl.innerHTML = '';
-  if(!selected){
-    inspectorEl.innerHTML = '<div class="muted">Select an object to edit</div>';
-    return;
-  }
-  const title = document.createElement('div');
-  title.style.fontWeight='700'; title.style.marginBottom='8px';
-  title.textContent = selected.name || selected.type;
-  inspectorEl.appendChild(title);
-
-  // position
-  ['x','y','z'].forEach(axis=>{
-    const row = document.createElement('div');
-    row.style.marginBottom='6px';
-    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Position ' + axis;
-    const input = document.createElement('input');
-    input.value = (selected.position[axis]||0).toFixed(3);
-    input.onchange = ()=> { selected.position[axis] = parseFloat(input.value); updateHierarchy(); };
-    row.appendChild(label); row.appendChild(input);
-    inspectorEl.appendChild(row);
-  });
-
-  // rotation (degrees)
-  ['x','y','z'].forEach(axis=>{
-    const row = document.createElement('div');
-    row.style.marginBottom='6px';
-    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Rotation ' + axis;
-    const input = document.createElement('input');
-    input.value = (THREE.MathUtils.radToDeg(selected.rotation[axis])||0).toFixed(2);
-    input.onchange = ()=> { selected.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(input.value)); };
-    row.appendChild(label); row.appendChild(input);
-    inspectorEl.appendChild(row);
-  });
-
-  // scale
-  ['x','y','z'].forEach(axis=>{
-    const row = document.createElement('div');
-    row.style.marginBottom='6px';
-    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Scale ' + axis;
-    const input = document.createElement('input');
-    input.value = (selected.scale[axis]||1).toFixed(3);
-    input.onchange = ()=> { selected.scale[axis] = parseFloat(input.value); };
-    row.appendChild(label); row.appendChild(input);
-    inspectorEl.appendChild(row);
-  });
-
-  // physics attach
-  const physRow = document.createElement('div'); physRow.style.marginTop='8px';
-  const physBtn = document.createElement('button'); physBtn.textContent = selected.userData.rigid ? 'Remove Rigidbody' : 'Add Rigidbody';
-  physBtn.onclick = ()=>{
-    if(selected.userData.rigid){ physicsObjects.delete(selected); delete selected.userData.rigid; physBtn.textContent='Add Rigidbody'; log('rigid removed'); }
-    else { enablePhysicsFor(selected, 1); selected.userData.halfHeight = 0.5; physBtn.textContent='Remove Rigidbody'; log('rigid added'); }
-  };
-  physRow.appendChild(physBtn);
-  inspectorEl.appendChild(physRow);
-}
-
-function updateInspector(){ if(selected) renderInspector(); }
-
-//// create object helpers ////
-function createCube(){
-  const geo = new THREE.BoxGeometry(1,1,1);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x88aaff });
-  const m = new THREE.Mesh(geo, mat);
-  m.castShadow = true; m.receiveShadow = true;
-  m.name = 'Cube';
-  m.position.set(0,1,0);
-  root.add(m);
-  addToHierarchy(m);
-  selectObject(m);
-  log('cube added');
-  return m;
-}
-function createSphere(){
-  const geo = new THREE.SphereGeometry(0.6,24,16);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffb86b });
-  const m = new THREE.Mesh(geo, mat);
-  m.name='Sphere'; m.position.set(0,1,0); root.add(m);
-  addToHierarchy(m);
-  selectObject(m);
-  log('sphere added'); return m;
-}
-function createLight(){
-  const l = new THREE.PointLight(0xffffff,1,15);
-  l.position.set(2,4,2); l.name='PointLight';
-  root.add(l); addToHierarchy(l); selectObject(l); log('light added'); return l;
-}
-
-//// UI wiring ////
-document.getElementById('btnAddCube').onclick = createCube;
-document.getElementById('btnAddSphere').onclick = createSphere;
-document.getElementById('btnAddLight').onclick = createLight;
-
-document.getElementById('btnPlay').onclick = ()=>{
-  if(running) return;
-  running = true; lastTime = performance.now(); log('Play');
-};
-document.getElementById('btnPause').onclick = ()=> { running = false; log('Pause'); };
-document.getElementById('btnStop').onclick = ()=>{
-  running = false;
-  // reset positions for physics-enabled objects
-  physicsObjects.forEach(o=>{
-    o.position.set(0,1,0);
-    o.userData.rigid.velocity.set(0,0,0);
-  });
-  log('Stop - reset physics objects');
-};
-
-document.getElementById('btnSave').onclick = ()=>{
-  const exportData = { objects: [] };
-  root.children.forEach(o=>{
-    if(!o.userData.root) return;
-    exportData.objects.push({
-      name: o.name, type: o.type, pos: o.position.toArray(), rot: o.rotation.toArray(), scale: o.scale.toArray(),
-      userData: { rigid: !!o.userData.rigid }
-    });
-  });
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='scene.json'; a.click(); URL.revokeObjectURL(url);
-  log('scene saved');
-};
-
-document.getElementById('fileLoad').addEventListener('change', (e)=>{
-  const f = e.target.files[0]; if(!f) return;
-  const fr = new FileReader(); fr.onload = ()=> {
-    try{
-      const data = JSON.parse(fr.result);
-      // clear scene
-      root.clear(); hierarchyEl.innerHTML='';
-      data.objects.forEach(o=>{
-        let mesh;
-        if(o.type === 'Mesh' || o.type === 'Mesh'){ mesh = createCube(); mesh.name = o.name; } // quick mapping
-        else mesh = createCube();
-        mesh.position.fromArray(o.pos);
-        mesh.rotation.fromArray(o.rot);
-        mesh.scale.fromArray(o.scale);
-        if(o.userData && o.userData.rigid) enablePhysicsFor(mesh,1);
-      });
-      log('scene loaded');
-    } catch(err){ log('load error', err.message); }
-  }; fr.readAsText(f);
-});
-
-document.getElementById('texUpload').addEventListener('change', (e)=>{
-  const f = e.target.files[0]; if(!f) return;
-  const url = URL.createObjectURL(f);
-  const img = document.createElement('img'); img.src = url; img.style.maxWidth='120px';
-  const assetEl = document.createElement('div'); assetEl.style.marginBottom='6px'; assetEl.appendChild(img);
-  assetsEl.prepend(assetEl);
-  // create a material sample
-  const tex = new THREE.TextureLoader().load(url, ()=> URL.revokeObjectURL(url));
-  if(selected && selected.material && 'map' in selected.material){
-    selected.material.map = tex; selected.material.needsUpdate = true; log('applied texture to selected');
-  }
-  log('texture uploaded');
-});
-
-//// Resize handling ////
-function onResize(){
-  const w = canvas.clientWidth; const h = canvas.clientHeight;
-  camera.aspect = w / h; camera.updateProjectionMatrix();
-  renderer.setSize(w,h);
-}
-new ResizeObserver(onResize).observe(canvas);
-onResize();
-
-//// render loop ////
-let frames=0, fpsTime = performance.now();
-function animate(){
-  requestAnimationFrame(animate);
-  const now = performance.now();
-  const dt = Math.min((now - lastTime) / 1000, 0.05);
-  if(running) stepPhysics(dt);
-  orbit.update();
-  renderer.render(scene, camera);
-  lastTime = now;
-
-  // stats
-  frames++;
-  if(now - fpsTime > 500){
-    statsEl.textContent = 'FPS: ' + Math.round((frames*1000)/(now-fpsTime));
-    frames = 0; fpsTime = now;
-  }
-}
-animate();
-
-//// initial demo objects ////
-createCube();
-createSphere();
-createLight();
-log('starter scene ready. Tips: Drag objects to translate. Use Play to run physics.');
-</script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
