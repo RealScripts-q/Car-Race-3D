@@ -2,554 +2,426 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Apex Racing — Single-File Demo</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WebEngine — Starter</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-  html,body { margin:0; height:100%; overflow:hidden; background:#0a0a0a; font-family:Inter,Arial,Helvetica,sans-serif; }
-  canvas { display:block; }
-  #hud {
-    position: absolute; left: 12px; top: 12px; z-index: 10; color: #fff;
-    display:flex; flex-direction:column; gap:8px;
-  }
-  .panel {
-    background: rgba(0,0,0,0.45); padding:8px 12px; border-radius:10px; backdrop-filter: blur(4px);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-  }
-  #controls { position: absolute; right: 12px; bottom: 12px; z-index:10; color:#ddd; }
-  #controls .panel { max-width:260px; font-size:13px; }
-  #mini { width:180px; height:120px; background:rgba(255,255,255,0.06); border-radius:8px; display:block; margin-top:6px; }
-  .big { font-size:18px; font-weight:700; }
-  #startMsg { position: absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#fff; font-size:20px; background:rgba(0,0,0,0.5); padding:14px 20px; border-radius:12px; }
-  button { background:#0d6efd; color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; }
-  button:active{ transform: translateY(1px); }
-  a { color:#9bdcff; text-decoration:none }
-  footer { position: absolute; left:50%; transform:translateX(-50%); bottom: 8px; color:#888; font-size:12px; }
+  :root{ --bg:#0b0f14; --panel:#0f1720; --muted:#9aa6b2; --accent:#4fc3f7; --glass: rgba(255,255,255,0.03)}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;color:#e6eef6;background:linear-gradient(180deg,#05060a,#08121a);}
+  .app{display:grid;grid-template-columns:260px 1fr 320px;grid-template-rows:48px 1fr;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
+  header{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-radius:10px;box-shadow:0 6px 20px rgba(2,6,12,.6)}
+  header h1{margin:0;font-size:14px;font-weight:600}
+  .left, .right{background:var(--panel);border-radius:10px;padding:12px;box-shadow:0 6px 18px rgba(2,6,12,.5);overflow:auto}
+  .center{position:relative;border-radius:10px;overflow:hidden;background:var(--glass);box-shadow:0 6px 30px rgba(2,6,12,.6)}
+  .panel-title{font-size:12px;color:var(--muted);margin-bottom:8px}
+  button{background:#0b2834;border:none;color:#dff6ff;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  #viewport{width:100%;height:calc(100vh - 96px);display:block}
+  .inspector input{width:100%;padding:6px;border-radius:6px;border:none;background:rgba(255,255,255,0.02);color:#eaf6ff}
+  .object-item{padding:6px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.02);cursor:pointer}
+  .object-item.selected{outline:2px solid rgba(79,195,247,.16)}
+  .top-controls{display:flex;gap:8px;margin-left:auto}
+  .small{font-size:12px;padding:6px 8px}
+  .muted{color:var(--muted);font-size:12px}
+  .footer-stats{position:absolute;left:12px;bottom:12px;padding:8px 10px;background:rgba(0,0,0,0.25);border-radius:8px;color:#dff6ff;font-weight:600}
+  input[type="file"]{display:none}
 </style>
 </head>
 <body>
-<div id="hud">
-  <div class="panel">
-    <div class="big" id="speed">Speed: 0 km/h</div>
-    <div id="lap">Lap: 0</div>
-  </div>
-  <div class="panel">
-    <div id="racePos">Position: 1 / 2</div>
-  </div>
+<div class="app">
+  <header>
+    <h1>WebEngine — Starter</h1>
+    <div class="top-controls">
+      <button id="btnPlay" class="small">Play</button>
+      <button id="btnPause" class="small">Pause</button>
+      <button id="btnStop" class="small">Stop</button>
+      <button id="btnAddCube" class="small">Add Cube</button>
+      <button id="btnAddSphere" class="small">Add Sphere</button>
+      <button id="btnAddLight" class="small">Add Light</button>
+      <button id="btnSave" class="small">Save Scene</button>
+      <label class="small" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+        <input id="fileLoad" type="file" accept="application/json"/>
+        <span class="small muted">Load Scene</span>
+      </label>
+      <label title="Upload Texture" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+        <input id="texUpload" type="file" accept="image/*"/>
+        <span class="small muted">Upload Tex</span>
+      </label>
+    </div>
+  </header>
+
+  <aside class="left">
+    <div class="panel-title">Hierarchy</div>
+    <div id="hierarchy"></div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
+    <div class="panel-title">Assets</div>
+    <div id="assets"></div>
+  </aside>
+
+  <main class="center">
+    <canvas id="viewport"></canvas>
+    <div class="footer-stats" id="stats">FPS: --</div>
+  </main>
+
+  <aside class="right">
+    <div class="panel-title">Inspector</div>
+    <div id="inspector" class="inspector">
+      <div class="muted">Select an object to edit</div>
+    </div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
+    <div class="panel-title">Console</div>
+    <div id="console" style="height:200px;overflow:auto;color:#cfeffd;font-size:13px"></div>
+  </aside>
 </div>
 
-<div id="controls">
-  <div class="panel">
-    <div><strong>Controls</strong></div>
-    <div style="margin-top:6px; font-size:13px;">
-      W / ↑ Accelerate &nbsp; S / ↓ Brake &nbsp; A / ← Steer Left &nbsp; D / → Steer Right<br>
-      Space: Handbrake / Reset
-    </div>
-    <div style="margin-top:8px;">
-      <button id="resetBtn">Reset Player</button>
-    </div>
-    <canvas id="mini"></canvas>
-  </div>
-</div>
-
-<div id="startMsg">Click or press W to start driving</div>
-<footer>Procedural assets: car, track, trees, mountain, rails — built from code.</footer>
-
+<!-- Three.js from CDN + OrbitControls -->
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-import { TubeGeometry } from 'https://unpkg.com/three@0.158.0/examples/jsm/geometries/TubeGeometry.js';
 
-/* ========== Config ========== */
-const CONFIG = {
-  trackRadius: 120,       // overall size
-  trackSegments: 400,     // smoothness of track tube
-  laneWidth: 8,
-  playerMaxSpeed: 180,    // km/h nominal
-  accel: 120,             // units per sec^2
-  brake: 260,
-  steerSpeed: 2.6,        // radians/sec steering responsiveness
-  aiCount: 1,
-  lapsToComplete: 2
-};
-
-/* ========== Three.js Setup ========== */
-const canvas = document.createElement('canvas');
-document.body.appendChild(canvas);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setSize(innerWidth, innerHeight);
+//// Minimal engine core ////
+const canvas = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setClearColor(0x08121a);
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x9fb4c8, 0.00065);
+scene.userData = { engine: true }; // marker
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
-camera.position.set(0, 8, 20);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+camera.position.set(6,4,6);
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
 
-window.addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight);
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-});
+const root = new THREE.Group();
+scene.add(root);
 
-/* ========== Lights ========== */
-const hemi = new THREE.HemisphereLight(0xdfefff, 0x666666, 0.9);
+//// Basic environment ////
+const hemi = new THREE.HemisphereLight(0xaaaaee, 0x222222, 0.6);
 scene.add(hemi);
-
-const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-dir.position.set(160, 300, 220);
+const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+dir.position.set(5,10,7);
 dir.castShadow = true;
-dir.shadow.camera.left = -200; dir.shadow.camera.right = 200;
-dir.shadow.camera.top = 200; dir.shadow.camera.bottom = -200;
-dir.shadow.mapSize.set(2048,2048);
 scene.add(dir);
 
-/* ========== Ground & Mountain ========== */
-const groundGeo = new THREE.PlaneGeometry(5000, 5000, 16, 16);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI/2;
-ground.receiveShadow = true;
-scene.add(ground);
+const grid = new THREE.GridHelper(50,50,'#24303a','#182126');
+grid.material.opacity = 0.2; grid.material.transparent = true;
+scene.add(grid);
 
-// simple mountain (cone + noise-ish)
-const mountain = new THREE.Mesh(
-  new THREE.ConeGeometry(260, 240, 20),
-  new THREE.MeshStandardMaterial({ color: 0x544b3b, flatShading: true })
-);
-mountain.position.set(-400, 80, -300);
-mountain.rotation.y = 0.9;
-mountain.receiveShadow = true;
-scene.add(mountain);
+//// Simple physics (integrator) ////
+const physicsObjects = new Set();
+let gravity = new THREE.Vector3(0,-9.81,0);
+let running = false;
+let lastTime = performance.now();
 
-/* ========== Procedural Track (CatmullRom curve + TubeGeometry) ========== */
-// Create a loop of control points with hills & turns
-function makeTrackPoints(radius=CONFIG.trackRadius, count=16) {
-  const pts = [];
-  for (let i=0;i<count;i++) {
-    const t = i/count * Math.PI*2;
-    // vary radius and height to make interesting corners
-    const r = radius + Math.sin(i*1.3)*30 + Math.cos(i*2.1)*18;
-    const x = Math.cos(t) * r;
-    const z = Math.sin(t) * r * 0.9; // slight elliptical shape
-    const y = Math.sin(i*0.6)*6 + Math.cos(i*0.4)*3;
-    pts.push(new THREE.Vector3(x, y, z));
-  }
-  // ensure closed loop
-  pts.push(pts[0].clone(), pts[1].clone(), pts[2].clone());
-  return pts;
-}
-const controlPoints = makeTrackPoints();
-const trackCurve = new THREE.CatmullRomCurve3(controlPoints, true, 'catmullrom', 0.5);
-
-// Track surface (tube)
-const tube = new TubeGeometry(trackCurve, CONFIG.trackSegments, CONFIG.laneWidth/2, 20, true);
-const trackMat = new THREE.MeshStandardMaterial({ color: 0x333f4f, metalness: 0.05, roughness: 0.7 });
-const trackMesh = new THREE.Mesh(tube, trackMat);
-trackMesh.receiveShadow = true;
-trackMesh.castShadow = false;
-scene.add(trackMesh);
-
-// centerline helper for lap detection & AI waypoints (sample many points along curve)
-const trackPoints = trackCurve.getSpacedPoints(CONFIG.trackSegments);
-/* Build left/right rails and lane markings by sampling curve tangents */
-const railGroup = new THREE.Group();
-const treeGroup = new THREE.Group();
-scene.add(railGroup, treeGroup);
-
-/* Add rails and trees */
-for (let i=0;i<trackPoints.length;i+=8) {
-  const p = trackPoints[i];
-  const pNext = trackPoints[(i+1)%trackPoints.length];
-  // tangent direction
-  const tangent = new THREE.Vector3().subVectors(pNext, p).normalize();
-  // perpendicular offset
-  const offset = new THREE.Vector3(-tangent.z, 0, tangent.x); // approx perp
-  const left = p.clone().add(offset.clone().multiplyScalar(CONFIG.laneWidth/1.1 + 2));
-  const right = p.clone().add(offset.clone().multiplyScalar(-CONFIG.laneWidth/1.1 - 2));
-
-  // rails (simple thin boxes)
-  const railGeo = new THREE.BoxGeometry(1.2, 0.4, 6);
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x262626 });
-  const railL = new THREE.Mesh(railGeo, railMat);
-  railL.position.copy(left).add(new THREE.Vector3(0,0.6,0));
-  railL.lookAt(p.clone().add(tangent));
-  railL.castShadow = true;
-  railGroup.add(railL);
-
-  const railR = railL.clone();
-  railR.position.copy(right).add(new THREE.Vector3(0,0.6,0));
-  railGroup.add(railR);
-
-  // trees near rails
-  const trunk = new THREE.CylinderGeometry(0.6, 0.6, 6, 8);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b3a24 });
-  const cone = new THREE.ConeGeometry(3.6, 12, 8);
-  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x164a19 });
-
-  // left tree
-  if (Math.random() > 0.2) {
-    const tmesh = new THREE.Mesh(trunk.clone(), trunkMat);
-    const lmesh = new THREE.Mesh(cone.clone(), leavesMat);
-    tmesh.position.copy(left).add(new THREE.Vector3((Math.random()-0.5)*8, 3, (Math.random()-0.5)*8));
-    lmesh.position.copy(tmesh.position).add(new THREE.Vector3(0,6,0));
-    tmesh.castShadow = true; lmesh.castShadow = true; tmesh.receiveShadow=true;
-    treeGroup.add(tmesh); treeGroup.add(lmesh);
-  }
-  // right tree
-  if (Math.random() > 0.2) {
-    const tmesh = new THREE.Mesh(trunk.clone(), trunkMat);
-    const lmesh = new THREE.Mesh(cone.clone(), leavesMat);
-    tmesh.position.copy(right).add(new THREE.Vector3((Math.random()-0.5)*8, 3, (Math.random()-0.5)*8));
-    lmesh.position.copy(tmesh.position).add(new THREE.Vector3(0,6,0));
-    tmesh.castShadow = true; lmesh.castShadow = true;
-    treeGroup.add(tmesh); treeGroup.add(lmesh);
-  }
+function enablePhysicsFor(obj, mass=1){
+  obj.userData.rigid = { mass: mass, velocity: new THREE.Vector3(), onGround:false };
+  physicsObjects.add(obj);
 }
 
-/* finish environment */
-scene.background = new THREE.Color(0x8fbce6);
+function stepPhysics(dt){
+  // simple Euler integrator + ground collision with plane y=0
+  physicsObjects.forEach(obj=>{
+    const r = obj.userData.rigid;
+    if(!r) return;
+    // integrate
+    const acc = gravity.clone().multiplyScalar(1); // constant g
+    r.velocity.addScaledVector(acc, dt);
+    obj.position.addScaledVector(r.velocity, dt);
 
-/* ========== Car Factory ========== */
-function makeCar(color=0xff0000) {
-  const car = new THREE.Group();
-
-  // body
-  const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.4 });
-  const bodyGeo = new THREE.BoxGeometry(3.2, 1.1, 5.2);
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 1.2;
-  body.castShadow = true;
-  car.add(body);
-
-  // cabin
-  const cabGeo = new THREE.BoxGeometry(2.0, 0.8, 2.4);
-  const cab = new THREE.Mesh(cabGeo, new THREE.MeshStandardMaterial({color:0x2b2b2b, metalness:0.1}));
-  cab.position.set(0, 1.7, -0.1);
-  cab.castShadow = true;
-  car.add(cab);
-
-  // wheels
-  const wheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.6, 16);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a });
-  const wheelOffsets = [
-    [-1.3, 0.6, 1.8],
-    [1.3, 0.6, 1.8],
-    [-1.3, 0.6, -1.8],
-    [1.3, 0.6, -1.8],
-  ];
-  wheelOffsets.forEach((o) => {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.rotation.z = Math.PI/2;
-    w.position.set(o[0], o[1], o[2]);
-    w.castShadow = true;
-    car.add(w);
+    // ground collision
+    if(obj.position.y - (obj.userData.halfHeight||0.5) < 0){
+      obj.position.y = (obj.userData.halfHeight||0.5);
+      if(r.velocity.y < 0) r.velocity.y = -r.velocity.y * 0.3; // bounce damping
+      // near-zero => stop
+      if(Math.abs(r.velocity.y) < 0.01) r.velocity.y = 0;
+    }
   });
-
-  // spoiler
-  const spoiler = new THREE.BoxGeometry(2.2, 0.15, 0.4);
-  const sp = new THREE.Mesh(spoiler, bodyMat);
-  sp.position.set(0, 1.95, 2.1);
-  car.add(sp);
-
-  return car;
 }
 
-/* ========== Player & AI Entities ========== */
-class Racer {
-  constructor(isPlayer=false, color=0xff0000) {
-    this.mesh = makeCar(color);
-    this.isPlayer = isPlayer;
-    this.position = new THREE.Vector3();
-    this.heading = 0; // radians, 0 along +Z
-    this.velocity = 0; // units/sec (world units)
-    this.maxSpeed = (CONFIG.playerMaxSpeed/3.6) * (isPlayer?1.0:0.9); // convert km/h to m/s-ish
-    this.acc = CONFIG.accel / 3.6;
-    this.brakePower = CONFIG.brake / 3.6;
-    this.steer = 0; // -1..1
-    this.mesh.castShadow = true;
-    this.lap = 0;
-    this.nextWaypoint = 0;
-    this.checkpointHits = 0;
-  }
-  addToScene(s) { s.add(this.mesh); }
-  setPose(p, heading) { this.position.copy(p); this.heading = heading; this.updateMesh(); }
-  updateMesh() {
-    this.mesh.position.copy(this.position);
-    // orientation: rotate around Y
-    this.mesh.rotation.y = this.heading;
-  }
-  step(dt) {
-    // simple physics integration
-    // velocity change by accel/brake
-    // friction
-    const friction = 2.0;
-    const drag = 1 + (Math.abs(this.velocity)/40); // increases with speed
-    // update velocity
-    // velocity already updated externally for player by control inputs, AI sets throttle/brake
-    // apply friction/drag
-    const decel = friction * dt;
-    if (this.velocity > 0) {
-      this.velocity = Math.max(0, this.velocity - decel*drag*dt*8);
-    } else if (this.velocity < 0) {
-      this.velocity = Math.min(0, this.velocity + decel*drag*dt*8);
-    }
-    // heading change based on steer and speed
-    const turnAmt = (this.steer * CONFIG.steerSpeed) * (Math.max(0.08, Math.min(1, this.velocity/20)));
-    this.heading += turnAmt * dt;
-    // advance position
-    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
-    this.position.add(forward.multiplyScalar(this.velocity * dt));
-    this.updateMesh();
-  }
+//// Selection & basic transform (translate only) ////
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selected = null;
+let isDragging = false;
+let dragStart = null;
+let plane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+
+function raycastFromPointer(evt){
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((evt.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((evt.clientY - rect.top) / rect.height) * 2 + 1;
+  ray.setFromCamera(mouse, camera);
+  const intersects = ray.intersectObjects(root.children, true).filter(i=>i.object.userData.pickable !== false);
+  return intersects;
 }
 
-/* spawn racers */
-const player = new Racer(true, 0xff3333);
-player.addToScene(scene);
-const aiRacers = [];
-for (let i=0;i<CONFIG.aiCount;i++) {
-  const ai = new Racer(false, 0x33c6ff);
-  ai.maxSpeed *= 0.98 + Math.random()*0.06;
-  ai.addToScene(scene);
-  aiRacers.push(ai);
-}
-
-/* place racers at start line (first few points of centerline) */
-const startPos = trackPoints[0].clone();
-player.setPose(startPos.clone().add(new THREE.Vector3(0,1.5, -6)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
-aiRacers.forEach((ai, idx) => {
-  const p = trackPoints[Math.floor(trackPoints.length * (idx+1)/(CONFIG.aiCount+2))].clone();
-  ai.setPose(p.clone().add(new THREE.Vector3(0,1.5, -6 + idx*4)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
-});
-
-/* ========== Input Handling ========== */
-const keys = {};
-window.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
-  startMsg.style.display = 'none';
-});
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-
-document.getElementById('resetBtn').addEventListener('click', () => {
-  player.setPose(startPos.clone().add(new THREE.Vector3(0,1.5,-6)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
-  player.velocity = 0; player.lap = 0; player.nextWaypoint = 0;
-});
-
-/* ========== Helper: find nearest track point index to a position ========== */
-function nearestTrackIndex(pos) {
-  let best = 0;
-  let bestD = Infinity;
-  for (let i=0;i<trackPoints.length;i++) {
-    const d = pos.distanceToSquared(trackPoints[i]);
-    if (d < bestD) { bestD = d; best = i; }
-  }
-  return best;
-}
-
-/* ========== Simple AI logic: follow next waypoint ========== */
-function aiStep(ai, dt) {
-  // find current target
-  const targetIndex = (ai.nextWaypoint) % trackPoints.length;
-  const target = trackPoints[targetIndex].clone();
-  target.y = ai.position.y;
-  // direction to target
-  const toTarget = new THREE.Vector3().subVectors(target, ai.position);
-  const dist = toTarget.length();
-  toTarget.normalize();
-  // desired heading
-  const desiredHeading = Math.atan2(toTarget.x, toTarget.z);
-  // compute steering (-1..1)
-  let dh = desiredHeading - ai.heading;
-  dh = ((dh + Math.PI) % (Math.PI*2)) - Math.PI; // normalize to [-PI,PI]
-  ai.steer = Math.max(-1, Math.min(1, dh * 2.0));
-  // throttle control
-  const throttle = (Math.abs(dh) < 0.5) ? 1.0 : 0.5;
-  // set ai velocity target
-  const targetSpeed = ai.maxSpeed * throttle;
-  if (ai.velocity < targetSpeed) ai.velocity += ai.acc * dt * 0.6;
-  else ai.velocity -= ai.brakePower * dt * 0.1;
-  // advance waypoint if close
-  if (dist < 18) ai.nextWaypoint = (ai.nextWaypoint + 1) % trackPoints.length;
-  ai.step(dt);
-}
-
-/* ========== Lap detection + ranking ========== */
-function updateLapAndPosition(racer) {
-  // if passes near index 0 and angle aligned, count lap
-  const idx = nearestTrackIndex(racer.position);
-  // if we've advanced beyond previous nextWaypoint, update nextWaypoint
-  if (idx > racer.nextWaypoint + 50) racer.nextWaypoint = idx;
-  // detect crossing start (index 0) by distance threshold and forward progress
-  if (idx < 6) {
-    if (racer.checkpointHits === 0) {
-      racer.checkpointHits = 1;
-    } else if (racer.checkpointHits === 1) {
-      // full loop complete
-      racer.lap++;
-      racer.checkpointHits = 0;
-    }
-  }
-}
-
-/* ========== Camera: third-person follow with smoothing ========== */
-const camOffset = new THREE.Vector3(0, 6, -12); // behind car local space
-function updateCamera(dt) {
-  // desired camera position (relative to player)
-  const forward = new THREE.Vector3(Math.sin(player.heading), 0, Math.cos(player.heading));
-  const desired = player.position.clone()
-                  .add(new THREE.Vector3(
-                    -forward.x * 12 * 0.9,
-                    6,
-                    -forward.z * 12 * 0.9
-                  ));
-  // lerp camera
-  camera.position.lerp(desired, 0.08);
-  // look slightly ahead
-  const lookAt = player.position.clone().add(forward.multiplyScalar(8));
-  camera.lookAt(lookAt);
-}
-
-/* ========== Mini-map (2D top-down rendering of track & racers) ========== */
-const miniCanvas = document.getElementById('mini');
-miniCanvas.width = 360; miniCanvas.height = 240;
-const miniCtx = miniCanvas.getContext('2d');
-function renderMini() {
-  const w = miniCanvas.width, h = miniCanvas.height;
-  miniCtx.fillStyle = 'rgba(8,12,16,0.7)'; miniCtx.fillRect(0,0,w,h);
-  // transform world coords into mini coords: center at (0,0) equals track center
-  const scale = 0.34;
-  const cx = w/2, cy = h/2;
-  // draw track centerline
-  miniCtx.strokeStyle = '#6ec8ff'; miniCtx.lineWidth = 2;
-  miniCtx.beginPath();
-  for (let i=0;i<trackPoints.length;i++) {
-    const p = trackPoints[i];
-    const x = cx + p.x*scale, y = cy + p.z*scale;
-    if (i===0) miniCtx.moveTo(x,y); else miniCtx.lineTo(x,y);
-  }
-  miniCtx.closePath(); miniCtx.stroke();
-  // racers
-  function drawR(r, col) {
-    miniCtx.fillStyle = col;
-    const x = cx + r.position.x*scale, y = cy + r.position.z*scale;
-    miniCtx.beginPath(); miniCtx.ellipse(x,y,6,4, -r.heading, 0, Math.PI*2); miniCtx.fill();
-  }
-  drawR(player, '#ff5656');
-  aiRacers.forEach(a => drawR(a, '#7fe7ff'));
-}
-
-/* ========== HUD Updates ========== */
-const speedEl = document.getElementById('speed');
-const lapEl = document.getElementById('lap');
-const posEl = document.getElementById('racePos');
-const startMsg = document.getElementById('startMsg');
-
-/* ========== Main Loop ========== */
-let last = performance.now();
-function animate(now) {
-  const dt = Math.min(0.05, (now - last)/1000);
-  last = now;
-
-  // player controls -> update player.steer and player.velocity
-  // accelerate / brake
-  const forwardKey = keys['w'] || keys['arrowup'];
-  const backKey = keys['s'] || keys['arrowdown'];
-  const leftKey = keys['a'] || keys['arrowleft'];
-  const rightKey = keys['d'] || keys['arrowright'];
-  const handbrake = keys[' '];
-
-  // throttle
-  if (forwardKey) {
-    player.velocity += player.acc * dt * 1.2;
-  } else if (backKey) {
-    player.velocity -= player.brakePower * dt * 0.9;
+renderer.domElement.addEventListener('pointerdown', (e)=>{
+  if(e.button !== 0) return;
+  const hits = raycastFromPointer(e);
+  if(hits.length){
+    const obj = hits[0].object.userData.root || hits[0].object;
+    selectObject(obj);
+    // prepare dragging on ground plane
+    const hitPoint = hits[0].point;
+    plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), hitPoint);
+    dragStart = hitPoint;
+    isDragging = true;
   } else {
-    // gentle rolling friction (handled in step)
+    selectObject(null);
   }
-  // clamp velocity
-  player.velocity = Math.max(-player.maxSpeed*0.4, Math.min(player.maxSpeed, player.velocity));
-
-  // steering: modify steer value toward target
-  const steerTarget = (leftKey ? -1 : 0) + (rightKey ? 1 : 0);
-  player.steer += (steerTarget - player.steer) * Math.min(1, CONFIG.steerSpeed * dt);
-
-  // handbrake resets orientation slightly and reduces speed
-  if (handbrake) {
-    player.velocity *= 0.94;
-    // optional: spin
-    // player.heading += 0.4*dt;
+});
+window.addEventListener('pointermove', (e)=>{
+  if(isDragging && selected){
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    ray.setFromCamera(mouse, camera);
+    const p = new THREE.Vector3();
+    ray.ray.intersectPlane(plane, p);
+    if(p && dragStart){
+      const delta = p.clone().sub(dragStart);
+      selected.position.add(delta);
+      dragStart.copy(p);
+      updateInspector(); updateHierarchy();
+    }
   }
+});
+window.addEventListener('pointerup', ()=> { isDragging = false; dragStart = null; });
 
-  // update player
-  player.step(dt);
+//// Scene management helpers ////
+const hierarchyEl = document.getElementById('hierarchy');
+const inspectorEl = document.getElementById('inspector');
+const assetsEl = document.getElementById('assets');
+const consoleEl = document.getElementById('console');
+const statsEl = document.getElementById('stats');
 
-  // keep player on track height (sample curve nearest point y)
-  const ni = nearestTrackIndex(player.position);
-  player.position.y = trackPoints[ni].y + 1.2;
+function log(...args){ const s = args.map(a=>typeof a==='object'?JSON.stringify(a):String(a)).join(' '); const p = document.createElement('div'); p.textContent = s; consoleEl.prepend(p); }
 
-  // AI step
-  aiRacers.forEach(ai => {
-    aiStep(ai, dt);
-    // align to track height
-    const n = nearestTrackIndex(ai.position);
-    ai.position.y = trackPoints[n].y + 1.2;
-    // lap detection for AI
-    updateLapAndPosition(ai);
+function addToHierarchy(obj){
+  obj.userData.root = obj;
+  const id = obj.uuid;
+  const el = document.createElement('div');
+  el.className = 'object-item';
+  el.id = 'obj-'+id;
+  el.textContent = obj.name || obj.type;
+  el.onclick = ()=> selectObject(obj);
+  hierarchyEl.prepend(el);
+}
+
+function removeFromHierarchy(obj){
+  const el = document.getElementById('obj-'+obj.uuid);
+  if(el) el.remove();
+}
+
+function updateHierarchy(){
+  Array.from(hierarchyEl.children).forEach(c=>c.classList.remove('selected'));
+  if(selected){
+    const el = document.getElementById('obj-'+selected.uuid);
+    if(el) el.classList.add('selected');
+  }
+}
+
+function selectObject(obj){
+  selected = obj;
+  updateHierarchy();
+  renderInspector();
+}
+
+function renderInspector(){
+  inspectorEl.innerHTML = '';
+  if(!selected){
+    inspectorEl.innerHTML = '<div class="muted">Select an object to edit</div>';
+    return;
+  }
+  const title = document.createElement('div');
+  title.style.fontWeight='700'; title.style.marginBottom='8px';
+  title.textContent = selected.name || selected.type;
+  inspectorEl.appendChild(title);
+
+  // position
+  ['x','y','z'].forEach(axis=>{
+    const row = document.createElement('div');
+    row.style.marginBottom='6px';
+    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Position ' + axis;
+    const input = document.createElement('input');
+    input.value = (selected.position[axis]||0).toFixed(3);
+    input.onchange = ()=> { selected.position[axis] = parseFloat(input.value); updateHierarchy(); };
+    row.appendChild(label); row.appendChild(input);
+    inspectorEl.appendChild(row);
   });
 
-  // lap & position updates for player
-  updateLapAndPosition(player);
+  // rotation (degrees)
+  ['x','y','z'].forEach(axis=>{
+    const row = document.createElement('div');
+    row.style.marginBottom='6px';
+    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Rotation ' + axis;
+    const input = document.createElement('input');
+    input.value = (THREE.MathUtils.radToDeg(selected.rotation[axis])||0).toFixed(2);
+    input.onchange = ()=> { selected.rotation[axis] = THREE.MathUtils.degToRad(parseFloat(input.value)); };
+    row.appendChild(label); row.appendChild(input);
+    inspectorEl.appendChild(row);
+  });
 
-  // camera
-  updateCamera(dt);
+  // scale
+  ['x','y','z'].forEach(axis=>{
+    const row = document.createElement('div');
+    row.style.marginBottom='6px';
+    const label = document.createElement('div'); label.className='muted'; label.textContent = 'Scale ' + axis;
+    const input = document.createElement('input');
+    input.value = (selected.scale[axis]||1).toFixed(3);
+    input.onchange = ()=> { selected.scale[axis] = parseFloat(input.value); };
+    row.appendChild(label); row.appendChild(input);
+    inspectorEl.appendChild(row);
+  });
 
-  // HUD
-  speedEl.innerText = `Speed: ${Math.round(player.velocity * 3.6) } km/h`;
-  lapEl.innerText = `Lap: ${player.lap} / ${CONFIG.lapsToComplete}`;
-  // race position (simple: compare lap then nearest waypoint)
-  const racers = [player].concat(aiRacers);
-  racers.sort((a,b) => (b.lap - a.lap) || (nearestTrackIndex(b.position) - nearestTrackIndex(a.position)));
-  const pos = racers.indexOf(player) + 1;
-  posEl.innerText = `Position: ${pos} / ${racers.length}`;
-
-  // mini-map
-  renderMini();
-
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
+  // physics attach
+  const physRow = document.createElement('div'); physRow.style.marginTop='8px';
+  const physBtn = document.createElement('button'); physBtn.textContent = selected.userData.rigid ? 'Remove Rigidbody' : 'Add Rigidbody';
+  physBtn.onclick = ()=>{
+    if(selected.userData.rigid){ physicsObjects.delete(selected); delete selected.userData.rigid; physBtn.textContent='Add Rigidbody'; log('rigid removed'); }
+    else { enablePhysicsFor(selected, 1); selected.userData.halfHeight = 0.5; physBtn.textContent='Remove Rigidbody'; log('rigid added'); }
+  };
+  physRow.appendChild(physBtn);
+  inspectorEl.appendChild(physRow);
 }
-requestAnimationFrame(animate);
 
-/* ========== Initial small polish ========== */
-// add some distant city-like boxes for depth
-for (let i=0;i<50;i++) {
-  const box = new THREE.Mesh(new THREE.BoxGeometry(30, 40 + Math.random()*160, 30),
-    new THREE.MeshStandardMaterial({ color: 0x203a4a, roughness: 0.85 }));
-  box.position.set((Math.random()-0.5)*1800, (box.geometry.parameters.height)/2 - 10, (Math.random()-0.5)*1800);
-  box.receiveShadow = true;
-  scene.add(box);
+function updateInspector(){ if(selected) renderInspector(); }
+
+//// create object helpers ////
+function createCube(){
+  const geo = new THREE.BoxGeometry(1,1,1);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x88aaff });
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true;
+  m.name = 'Cube';
+  m.position.set(0,1,0);
+  root.add(m);
+  addToHierarchy(m);
+  selectObject(m);
+  log('cube added');
+  return m;
+}
+function createSphere(){
+  const geo = new THREE.SphereGeometry(0.6,24,16);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffb86b });
+  const m = new THREE.Mesh(geo, mat);
+  m.name='Sphere'; m.position.set(0,1,0); root.add(m);
+  addToHierarchy(m);
+  selectObject(m);
+  log('sphere added'); return m;
+}
+function createLight(){
+  const l = new THREE.PointLight(0xffffff,1,15);
+  l.position.set(2,4,2); l.name='PointLight';
+  root.add(l); addToHierarchy(l); selectObject(l); log('light added'); return l;
 }
 
-// little ambient movement to make scene feel alive
-(function idleParticles() {
-  const g = new THREE.BufferGeometry();
-  const n = 2000;
-  const pos = new Float32Array(n*3);
-  for (let i=0;i<n;i++) {
-    pos[i*3] = (Math.random()-0.5)*2000;
-    pos[i*3+1] = Math.random()*80;
-    pos[i*3+2] = (Math.random()-0.5)*2000;
+//// UI wiring ////
+document.getElementById('btnAddCube').onclick = createCube;
+document.getElementById('btnAddSphere').onclick = createSphere;
+document.getElementById('btnAddLight').onclick = createLight;
+
+document.getElementById('btnPlay').onclick = ()=>{
+  if(running) return;
+  running = true; lastTime = performance.now(); log('Play');
+};
+document.getElementById('btnPause').onclick = ()=> { running = false; log('Pause'); };
+document.getElementById('btnStop').onclick = ()=>{
+  running = false;
+  // reset positions for physics-enabled objects
+  physicsObjects.forEach(o=>{
+    o.position.set(0,1,0);
+    o.userData.rigid.velocity.set(0,0,0);
+  });
+  log('Stop - reset physics objects');
+};
+
+document.getElementById('btnSave').onclick = ()=>{
+  const exportData = { objects: [] };
+  root.children.forEach(o=>{
+    if(!o.userData.root) return;
+    exportData.objects.push({
+      name: o.name, type: o.type, pos: o.position.toArray(), rot: o.rotation.toArray(), scale: o.scale.toArray(),
+      userData: { rigid: !!o.userData.rigid }
+    });
+  });
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='scene.json'; a.click(); URL.revokeObjectURL(url);
+  log('scene saved');
+};
+
+document.getElementById('fileLoad').addEventListener('change', (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const fr = new FileReader(); fr.onload = ()=> {
+    try{
+      const data = JSON.parse(fr.result);
+      // clear scene
+      root.clear(); hierarchyEl.innerHTML='';
+      data.objects.forEach(o=>{
+        let mesh;
+        if(o.type === 'Mesh' || o.type === 'Mesh'){ mesh = createCube(); mesh.name = o.name; } // quick mapping
+        else mesh = createCube();
+        mesh.position.fromArray(o.pos);
+        mesh.rotation.fromArray(o.rot);
+        mesh.scale.fromArray(o.scale);
+        if(o.userData && o.userData.rigid) enablePhysicsFor(mesh,1);
+      });
+      log('scene loaded');
+    } catch(err){ log('load error', err.message); }
+  }; fr.readAsText(f);
+});
+
+document.getElementById('texUpload').addEventListener('change', (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  const img = document.createElement('img'); img.src = url; img.style.maxWidth='120px';
+  const assetEl = document.createElement('div'); assetEl.style.marginBottom='6px'; assetEl.appendChild(img);
+  assetsEl.prepend(assetEl);
+  // create a material sample
+  const tex = new THREE.TextureLoader().load(url, ()=> URL.revokeObjectURL(url));
+  if(selected && selected.material && 'map' in selected.material){
+    selected.material.map = tex; selected.material.needsUpdate = true; log('applied texture to selected');
   }
-  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  const p = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, transparent: true, opacity: 0.04 }));
-  scene.add(p);
-})();
+  log('texture uploaded');
+});
 
-/* ========== Start Hint Listener ======= */
-window.addEventListener('click', () => startMsg.style.display = 'none');
-window.addEventListener('keydown', () => startMsg.style.display = 'none');
+//// Resize handling ////
+function onResize(){
+  const w = canvas.clientWidth; const h = canvas.clientHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+}
+new ResizeObserver(onResize).observe(canvas);
+onResize();
 
+//// render loop ////
+let frames=0, fpsTime = performance.now();
+function animate(){
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  if(running) stepPhysics(dt);
+  orbit.update();
+  renderer.render(scene, camera);
+  lastTime = now;
+
+  // stats
+  frames++;
+  if(now - fpsTime > 500){
+    statsEl.textContent = 'FPS: ' + Math.round((frames*1000)/(now-fpsTime));
+    frames = 0; fpsTime = now;
+  }
+}
+animate();
+
+//// initial demo objects ////
+createCube();
+createSphere();
+createLight();
+log('starter scene ready. Tips: Drag objects to translate. Use Play to run physics.');
 </script>
 </body>
 </html>
