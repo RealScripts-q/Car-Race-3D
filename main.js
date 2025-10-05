@@ -1,134 +1,119 @@
 import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
 
-// Core setup
-const canvas = document.getElementById("viewport");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setClearColor(0x08121a);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
+let scene, camera, renderer, controls;
+let objects = [];
+let isPlaying = false;
+let clock = new THREE.Clock();
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
-camera.position.set(6, 4, 6);
-
-const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.enableDamping = true;
-
-const root = new THREE.Group();
-scene.add(root);
-
-// Lighting and environment
-scene.add(new THREE.HemisphereLight(0xaaaaee, 0x222222, 0.6));
-const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-dir.position.set(5, 10, 7);
-dir.castShadow = true;
-scene.add(dir);
-
-const grid = new THREE.GridHelper(50, 50, "#24303a", "#182126");
-grid.material.opacity = 0.2;
-grid.material.transparent = true;
-scene.add(grid);
-
-// Elements
-const hierarchyEl = document.getElementById("hierarchy");
-const consoleEl = document.getElementById("console");
-const statsEl = document.getElementById("stats");
-let selected = null, running = false, lastTime = performance.now();
-const physicsObjects = new Set();
-const gravity = new THREE.Vector3(0, -9.81, 0);
-
-function log(msg) {
-  const el = document.createElement("div");
-  el.textContent = msg;
-  consoleEl.prepend(el);
-}
-
-// Object creators
-function createCube() {
-  const m = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color: 0x88aaff })
-  );
-  m.name = "Cube";
-  m.position.y = 1;
-  root.add(m);
-  updateHierarchy(m);
-  log("Cube added");
-}
-
-function createSphere() {
-  const m = new THREE.Mesh(
-    new THREE.SphereGeometry(0.6, 24, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffb86b })
-  );
-  m.name = "Sphere";
-  m.position.y = 1;
-  root.add(m);
-  updateHierarchy(m);
-  log("Sphere added");
-}
-
-function createLight() {
-  const l = new THREE.PointLight(0xffffff, 1, 15);
-  l.name = "PointLight";
-  l.position.set(2, 4, 2);
-  root.add(l);
-  updateHierarchy(l);
-  log("Light added");
-}
-
-// Hierarchy management
-function updateHierarchy(obj) {
-  const el = document.createElement("div");
-  el.className = "object-item";
-  el.textContent = obj.name;
-  el.onclick = () => selectObject(obj, el);
-  hierarchyEl.prepend(el);
-}
-
-function selectObject(obj, el) {
-  selected = obj;
-  Array.from(hierarchyEl.children).forEach(c => c.classList.remove("selected"));
-  if (el) el.classList.add("selected");
-  log(`Selected ${obj.name}`);
-}
-
-// UI
-document.getElementById("btnAddCube").onclick = createCube;
-document.getElementById("btnAddSphere").onclick = createSphere;
-document.getElementById("btnAddLight").onclick = createLight;
-
-document.getElementById("btnPlay").onclick = () => { running = true; log("Play"); };
-document.getElementById("btnPause").onclick = () => { running = false; log("Pause"); };
-document.getElementById("btnStop").onclick = () => { running = false; log("Stop"); };
-
-// Resize and render
-function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
-}
-new ResizeObserver(resize).observe(canvas);
-resize();
-
-let frames = 0, fpsTime = performance.now();
-function animate() {
-  requestAnimationFrame(animate);
-  const now = performance.now();
-  orbit.update();
-  renderer.render(scene, camera);
-  frames++;
-  if (now - fpsTime > 500) {
-    statsEl.textContent = `FPS: ${Math.round((frames * 1000) / (now - fpsTime))}`;
-    frames = 0; fpsTime = now;
-  }
-}
+init();
 animate();
 
-// Starter objects
-createCube();
-createSphere();
-createLight();
-log("Starter scene ready.");
+function init() {
+  // Scene setup
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x202020);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(3, 3, 5);
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("viewport"), antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // Orbit Controls
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+
+  // Default light
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+
+  const directional = new THREE.DirectionalLight(0xffffff, 1);
+  directional.position.set(3, 5, 2);
+  scene.add(directional);
+
+  // Add ground
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 20),
+    new THREE.MeshStandardMaterial({ color: 0x222222 })
+  );
+  plane.rotation.x = -Math.PI / 2;
+  scene.add(plane);
+
+  // Events
+  window.addEventListener("resize", onWindowResize);
+  document.getElementById("play").addEventListener("click", playScene);
+  document.getElementById("pause").addEventListener("click", pauseScene);
+  document.getElementById("stop").addEventListener("click", stopScene);
+  document.getElementById("addCube").addEventListener("click", addCube);
+  document.getElementById("addSphere").addEventListener("click", addSphere);
+  document.getElementById("addLight").addEventListener("click", addLight);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function addCube() {
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+  const cube = new THREE.Mesh(geometry, material);
+  cube.position.set(Math.random() * 4 - 2, 1, Math.random() * 4 - 2);
+  scene.add(cube);
+  objects.push(cube);
+}
+
+function addSphere() {
+  const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+  const material = new THREE.MeshStandardMaterial({ color: 0xff5500 });
+  const sphere = new THREE.Mesh(geometry, material);
+  sphere.position.set(Math.random() * 4 - 2, 1, Math.random() * 4 - 2);
+  scene.add(sphere);
+  objects.push(sphere);
+}
+
+function addLight() {
+  const light = new THREE.PointLight(0xffffff, 1, 20);
+  light.position.set(Math.random() * 6 - 3, 3, Math.random() * 6 - 3);
+  scene.add(light);
+}
+
+function playScene() {
+  isPlaying = true;
+}
+
+function pauseScene() {
+  isPlaying = false;
+}
+
+function stopScene() {
+  isPlaying = false;
+  objects.forEach((obj) => {
+    obj.rotation.set(0, 0, 0);
+  });
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+
+  if (isPlaying) {
+    objects.forEach((obj) => {
+      obj.rotation.y += delta;
+      obj.rotation.x += delta * 0.5;
+    });
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
