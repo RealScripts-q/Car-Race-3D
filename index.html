@@ -1,58 +1,31 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebEngine — Starter</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini 3D Engine</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>WebEngine — Starter</h1>
-      <div class="top-controls">
-        <button id="btnPlay" class="small">Play</button>
-        <button id="btnPause" class="small">Pause</button>
-        <button id="btnStop" class="small">Stop</button>
-        <button id="btnAddCube" class="small">Add Cube</button>
-        <button id="btnAddSphere" class="small">Add Sphere</button>
-        <button id="btnAddLight" class="small">Add Light</button>
-        <button id="btnSave" class="small">Save Scene</button>
-        <label class="small" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-          <input id="fileLoad" type="file" accept="application/json"/>
-          <span class="small muted">Load Scene</span>
-        </label>
-        <label title="Upload Texture" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
-          <input id="texUpload" type="file" accept="image/*"/>
-          <span class="small muted">Upload Tex</span>
-        </label>
-      </div>
-    </header>
+  <header>
+    <h1>Mini 3D Engine</h1>
+    <div class="controls">
+      <button id="play">Play</button>
+      <button id="pause">Pause</button>
+      <button id="stop">Stop</button>
+      <button id="addCube">Add Cube</button>
+      <button id="addSphere">Add Sphere</button>
+      <button id="addLight">Add Light</button>
+    </div>
+  </header>
 
-    <aside class="left">
-      <div class="panel-title">Hierarchy</div>
-      <div id="hierarchy"></div>
-      <hr>
-      <div class="panel-title">Assets</div>
-      <div id="assets"></div>
-    </aside>
+  <main>
+    <canvas id="viewport"></canvas>
+  </main>
 
-    <main class="center">
-      <canvas id="viewport"></canvas>
-      <div class="footer-stats" id="stats">FPS: --</div>
-    </main>
-
-    <aside class="right">
-      <div class="panel-title">Inspector</div>
-      <div id="inspector" class="inspector">
-        <div class="muted">Select an object to edit</div>
-      </div>
-      <hr>
-      <div class="panel-title">Console</div>
-      <div id="console"></div>
-    </aside>
-  </div>
+  <footer>
+    <p>Powered by Three.js | GitHub Pages Ready</p>
+  </footer>
 
   <script type="module" src="main.js"></script>
 </body>
