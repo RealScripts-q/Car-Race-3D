@@ -1,0 +1,145 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #0f1720;
+  --muted: #9aa6b2;
+  --accent: #4fc3f7;
+  --glass: rgba(255, 255, 255, 0.03);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, system-ui, Arial;
+  color: #e6eef6;
+  background: linear-gradient(180deg, #05060a, #08121a);
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  grid-template-rows: 48px 1fr;
+  gap: 12px;
+  height: 100vh;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(2, 6, 12, 0.6);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.left, .right {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(2, 6, 12, 0.5);
+  overflow: auto;
+}
+
+.center {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--glass);
+  box-shadow: 0 6px 30px rgba(2, 6, 12, 0.6);
+}
+
+.panel-title {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+button {
+  background: #0b2834;
+  border: none;
+  color: #dff6ff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#viewport {
+  width: 100%;
+  height: calc(100vh - 96px);
+  display: block;
+}
+
+.inspector input {
+  width: 100%;
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.02);
+  color: #eaf6ff;
+}
+
+.object-item {
+  padding: 6px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.object-item.selected {
+  outline: 2px solid rgba(79, 195, 247, 0.16);
+}
+
+.top-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.small {
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.footer-stats {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  color: #dff6ff;
+  font-weight: 600;
+}
+
+#console {
+  height: 200px;
+  overflow: auto;
+  color: #cfeffd;
+  font-size: 13px;
+}
+
+input[type="file"] {
+  display: none;
+}
