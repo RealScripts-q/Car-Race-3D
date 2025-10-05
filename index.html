@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Apex Racing — Single-File Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#0a0a0a; font-family:Inter,Arial,Helvetica,sans-serif; }
+  canvas { display:block; }
+  #hud {
+    position: absolute; left: 12px; top: 12px; z-index: 10; color: #fff;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .panel {
+    background: rgba(0,0,0,0.45); padding:8px 12px; border-radius:10px; backdrop-filter: blur(4px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  }
+  #controls { position: absolute; right: 12px; bottom: 12px; z-index:10; color:#ddd; }
+  #controls .panel { max-width:260px; font-size:13px; }
+  #mini { width:180px; height:120px; background:rgba(255,255,255,0.06); border-radius:8px; display:block; margin-top:6px; }
+  .big { font-size:18px; font-weight:700; }
+  #startMsg { position: absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:#fff; font-size:20px; background:rgba(0,0,0,0.5); padding:14px 20px; border-radius:12px; }
+  button { background:#0d6efd; color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; }
+  button:active{ transform: translateY(1px); }
+  a { color:#9bdcff; text-decoration:none }
+  footer { position: absolute; left:50%; transform:translateX(-50%); bottom: 8px; color:#888; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="panel">
+    <div class="big" id="speed">Speed: 0 km/h</div>
+    <div id="lap">Lap: 0</div>
+  </div>
+  <div class="panel">
+    <div id="racePos">Position: 1 / 2</div>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="panel">
+    <div><strong>Controls</strong></div>
+    <div style="margin-top:6px; font-size:13px;">
+      W / ↑ Accelerate &nbsp; S / ↓ Brake &nbsp; A / ← Steer Left &nbsp; D / → Steer Right<br>
+      Space: Handbrake / Reset
+    </div>
+    <div style="margin-top:8px;">
+      <button id="resetBtn">Reset Player</button>
+    </div>
+    <canvas id="mini"></canvas>
+  </div>
+</div>
+
+<div id="startMsg">Click or press W to start driving</div>
+<footer>Procedural assets: car, track, trees, mountain, rails — built from code.</footer>
+
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+import { TubeGeometry } from 'https://unpkg.com/three@0.158.0/examples/jsm/geometries/TubeGeometry.js';
+
+/* ========== Config ========== */
+const CONFIG = {
+  trackRadius: 120,       // overall size
+  trackSegments: 400,     // smoothness of track tube
+  laneWidth: 8,
+  playerMaxSpeed: 180,    // km/h nominal
+  accel: 120,             // units per sec^2
+  brake: 260,
+  steerSpeed: 2.6,        // radians/sec steering responsiveness
+  aiCount: 1,
+  lapsToComplete: 2
+};
+
+/* ========== Three.js Setup ========== */
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x9fb4c8, 0.00065);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 2000);
+camera.position.set(0, 8, 20);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+/* ========== Lights ========== */
+const hemi = new THREE.HemisphereLight(0xdfefff, 0x666666, 0.9);
+scene.add(hemi);
+
+const dir = new THREE.DirectionalLight(0xffffff, 1.0);
+dir.position.set(160, 300, 220);
+dir.castShadow = true;
+dir.shadow.camera.left = -200; dir.shadow.camera.right = 200;
+dir.shadow.camera.top = 200; dir.shadow.camera.bottom = -200;
+dir.shadow.mapSize.set(2048,2048);
+scene.add(dir);
+
+/* ========== Ground & Mountain ========== */
+const groundGeo = new THREE.PlaneGeometry(5000, 5000, 16, 16);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// simple mountain (cone + noise-ish)
+const mountain = new THREE.Mesh(
+  new THREE.ConeGeometry(260, 240, 20),
+  new THREE.MeshStandardMaterial({ color: 0x544b3b, flatShading: true })
+);
+mountain.position.set(-400, 80, -300);
+mountain.rotation.y = 0.9;
+mountain.receiveShadow = true;
+scene.add(mountain);
+
+/* ========== Procedural Track (CatmullRom curve + TubeGeometry) ========== */
+// Create a loop of control points with hills & turns
+function makeTrackPoints(radius=CONFIG.trackRadius, count=16) {
+  const pts = [];
+  for (let i=0;i<count;i++) {
+    const t = i/count * Math.PI*2;
+    // vary radius and height to make interesting corners
+    const r = radius + Math.sin(i*1.3)*30 + Math.cos(i*2.1)*18;
+    const x = Math.cos(t) * r;
+    const z = Math.sin(t) * r * 0.9; // slight elliptical shape
+    const y = Math.sin(i*0.6)*6 + Math.cos(i*0.4)*3;
+    pts.push(new THREE.Vector3(x, y, z));
+  }
+  // ensure closed loop
+  pts.push(pts[0].clone(), pts[1].clone(), pts[2].clone());
+  return pts;
+}
+const controlPoints = makeTrackPoints();
+const trackCurve = new THREE.CatmullRomCurve3(controlPoints, true, 'catmullrom', 0.5);
+
+// Track surface (tube)
+const tube = new TubeGeometry(trackCurve, CONFIG.trackSegments, CONFIG.laneWidth/2, 20, true);
+const trackMat = new THREE.MeshStandardMaterial({ color: 0x333f4f, metalness: 0.05, roughness: 0.7 });
+const trackMesh = new THREE.Mesh(tube, trackMat);
+trackMesh.receiveShadow = true;
+trackMesh.castShadow = false;
+scene.add(trackMesh);
+
+// centerline helper for lap detection & AI waypoints (sample many points along curve)
+const trackPoints = trackCurve.getSpacedPoints(CONFIG.trackSegments);
+/* Build left/right rails and lane markings by sampling curve tangents */
+const railGroup = new THREE.Group();
+const treeGroup = new THREE.Group();
+scene.add(railGroup, treeGroup);
+
+/* Add rails and trees */
+for (let i=0;i<trackPoints.length;i+=8) {
+  const p = trackPoints[i];
+  const pNext = trackPoints[(i+1)%trackPoints.length];
+  // tangent direction
+  const tangent = new THREE.Vector3().subVectors(pNext, p).normalize();
+  // perpendicular offset
+  const offset = new THREE.Vector3(-tangent.z, 0, tangent.x); // approx perp
+  const left = p.clone().add(offset.clone().multiplyScalar(CONFIG.laneWidth/1.1 + 2));
+  const right = p.clone().add(offset.clone().multiplyScalar(-CONFIG.laneWidth/1.1 - 2));
+
+  // rails (simple thin boxes)
+  const railGeo = new THREE.BoxGeometry(1.2, 0.4, 6);
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x262626 });
+  const railL = new THREE.Mesh(railGeo, railMat);
+  railL.position.copy(left).add(new THREE.Vector3(0,0.6,0));
+  railL.lookAt(p.clone().add(tangent));
+  railL.castShadow = true;
+  railGroup.add(railL);
+
+  const railR = railL.clone();
+  railR.position.copy(right).add(new THREE.Vector3(0,0.6,0));
+  railGroup.add(railR);
+
+  // trees near rails
+  const trunk = new THREE.CylinderGeometry(0.6, 0.6, 6, 8);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b3a24 });
+  const cone = new THREE.ConeGeometry(3.6, 12, 8);
+  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x164a19 });
+
+  // left tree
+  if (Math.random() > 0.2) {
+    const tmesh = new THREE.Mesh(trunk.clone(), trunkMat);
+    const lmesh = new THREE.Mesh(cone.clone(), leavesMat);
+    tmesh.position.copy(left).add(new THREE.Vector3((Math.random()-0.5)*8, 3, (Math.random()-0.5)*8));
+    lmesh.position.copy(tmesh.position).add(new THREE.Vector3(0,6,0));
+    tmesh.castShadow = true; lmesh.castShadow = true; tmesh.receiveShadow=true;
+    treeGroup.add(tmesh); treeGroup.add(lmesh);
+  }
+  // right tree
+  if (Math.random() > 0.2) {
+    const tmesh = new THREE.Mesh(trunk.clone(), trunkMat);
+    const lmesh = new THREE.Mesh(cone.clone(), leavesMat);
+    tmesh.position.copy(right).add(new THREE.Vector3((Math.random()-0.5)*8, 3, (Math.random()-0.5)*8));
+    lmesh.position.copy(tmesh.position).add(new THREE.Vector3(0,6,0));
+    tmesh.castShadow = true; lmesh.castShadow = true;
+    treeGroup.add(tmesh); treeGroup.add(lmesh);
+  }
+}
+
+/* finish environment */
+scene.background = new THREE.Color(0x8fbce6);
+
+/* ========== Car Factory ========== */
+function makeCar(color=0xff0000) {
+  const car = new THREE.Group();
+
+  // body
+  const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.4 });
+  const bodyGeo = new THREE.BoxGeometry(3.2, 1.1, 5.2);
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 1.2;
+  body.castShadow = true;
+  car.add(body);
+
+  // cabin
+  const cabGeo = new THREE.BoxGeometry(2.0, 0.8, 2.4);
+  const cab = new THREE.Mesh(cabGeo, new THREE.MeshStandardMaterial({color:0x2b2b2b, metalness:0.1}));
+  cab.position.set(0, 1.7, -0.1);
+  cab.castShadow = true;
+  car.add(cab);
+
+  // wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.6, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a });
+  const wheelOffsets = [
+    [-1.3, 0.6, 1.8],
+    [1.3, 0.6, 1.8],
+    [-1.3, 0.6, -1.8],
+    [1.3, 0.6, -1.8],
+  ];
+  wheelOffsets.forEach((o) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI/2;
+    w.position.set(o[0], o[1], o[2]);
+    w.castShadow = true;
+    car.add(w);
+  });
+
+  // spoiler
+  const spoiler = new THREE.BoxGeometry(2.2, 0.15, 0.4);
+  const sp = new THREE.Mesh(spoiler, bodyMat);
+  sp.position.set(0, 1.95, 2.1);
+  car.add(sp);
+
+  return car;
+}
+
+/* ========== Player & AI Entities ========== */
+class Racer {
+  constructor(isPlayer=false, color=0xff0000) {
+    this.mesh = makeCar(color);
+    this.isPlayer = isPlayer;
+    this.position = new THREE.Vector3();
+    this.heading = 0; // radians, 0 along +Z
+    this.velocity = 0; // units/sec (world units)
+    this.maxSpeed = (CONFIG.playerMaxSpeed/3.6) * (isPlayer?1.0:0.9); // convert km/h to m/s-ish
+    this.acc = CONFIG.accel / 3.6;
+    this.brakePower = CONFIG.brake / 3.6;
+    this.steer = 0; // -1..1
+    this.mesh.castShadow = true;
+    this.lap = 0;
+    this.nextWaypoint = 0;
+    this.checkpointHits = 0;
+  }
+  addToScene(s) { s.add(this.mesh); }
+  setPose(p, heading) { this.position.copy(p); this.heading = heading; this.updateMesh(); }
+  updateMesh() {
+    this.mesh.position.copy(this.position);
+    // orientation: rotate around Y
+    this.mesh.rotation.y = this.heading;
+  }
+  step(dt) {
+    // simple physics integration
+    // velocity change by accel/brake
+    // friction
+    const friction = 2.0;
+    const drag = 1 + (Math.abs(this.velocity)/40); // increases with speed
+    // update velocity
+    // velocity already updated externally for player by control inputs, AI sets throttle/brake
+    // apply friction/drag
+    const decel = friction * dt;
+    if (this.velocity > 0) {
+      this.velocity = Math.max(0, this.velocity - decel*drag*dt*8);
+    } else if (this.velocity < 0) {
+      this.velocity = Math.min(0, this.velocity + decel*drag*dt*8);
+    }
+    // heading change based on steer and speed
+    const turnAmt = (this.steer * CONFIG.steerSpeed) * (Math.max(0.08, Math.min(1, this.velocity/20)));
+    this.heading += turnAmt * dt;
+    // advance position
+    const forward = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+    this.position.add(forward.multiplyScalar(this.velocity * dt));
+    this.updateMesh();
+  }
+}
+
+/* spawn racers */
+const player = new Racer(true, 0xff3333);
+player.addToScene(scene);
+const aiRacers = [];
+for (let i=0;i<CONFIG.aiCount;i++) {
+  const ai = new Racer(false, 0x33c6ff);
+  ai.maxSpeed *= 0.98 + Math.random()*0.06;
+  ai.addToScene(scene);
+  aiRacers.push(ai);
+}
+
+/* place racers at start line (first few points of centerline) */
+const startPos = trackPoints[0].clone();
+player.setPose(startPos.clone().add(new THREE.Vector3(0,1.5, -6)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
+aiRacers.forEach((ai, idx) => {
+  const p = trackPoints[Math.floor(trackPoints.length * (idx+1)/(CONFIG.aiCount+2))].clone();
+  ai.setPose(p.clone().add(new THREE.Vector3(0,1.5, -6 + idx*4)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
+});
+
+/* ========== Input Handling ========== */
+const keys = {};
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  startMsg.style.display = 'none';
+});
+window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  player.setPose(startPos.clone().add(new THREE.Vector3(0,1.5,-6)), Math.atan2(trackPoints[1].x - trackPoints[0].x, trackPoints[1].z - trackPoints[0].z) + Math.PI);
+  player.velocity = 0; player.lap = 0; player.nextWaypoint = 0;
+});
+
+/* ========== Helper: find nearest track point index to a position ========== */
+function nearestTrackIndex(pos) {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i=0;i<trackPoints.length;i++) {
+    const d = pos.distanceToSquared(trackPoints[i]);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+/* ========== Simple AI logic: follow next waypoint ========== */
+function aiStep(ai, dt) {
+  // find current target
+  const targetIndex = (ai.nextWaypoint) % trackPoints.length;
+  const target = trackPoints[targetIndex].clone();
+  target.y = ai.position.y;
+  // direction to target
+  const toTarget = new THREE.Vector3().subVectors(target, ai.position);
+  const dist = toTarget.length();
+  toTarget.normalize();
+  // desired heading
+  const desiredHeading = Math.atan2(toTarget.x, toTarget.z);
+  // compute steering (-1..1)
+  let dh = desiredHeading - ai.heading;
+  dh = ((dh + Math.PI) % (Math.PI*2)) - Math.PI; // normalize to [-PI,PI]
+  ai.steer = Math.max(-1, Math.min(1, dh * 2.0));
+  // throttle control
+  const throttle = (Math.abs(dh) < 0.5) ? 1.0 : 0.5;
+  // set ai velocity target
+  const targetSpeed = ai.maxSpeed * throttle;
+  if (ai.velocity < targetSpeed) ai.velocity += ai.acc * dt * 0.6;
+  else ai.velocity -= ai.brakePower * dt * 0.1;
+  // advance waypoint if close
+  if (dist < 18) ai.nextWaypoint = (ai.nextWaypoint + 1) % trackPoints.length;
+  ai.step(dt);
+}
+
+/* ========== Lap detection + ranking ========== */
+function updateLapAndPosition(racer) {
+  // if passes near index 0 and angle aligned, count lap
+  const idx = nearestTrackIndex(racer.position);
+  // if we've advanced beyond previous nextWaypoint, update nextWaypoint
+  if (idx > racer.nextWaypoint + 50) racer.nextWaypoint = idx;
+  // detect crossing start (index 0) by distance threshold and forward progress
+  if (idx < 6) {
+    if (racer.checkpointHits === 0) {
+      racer.checkpointHits = 1;
+    } else if (racer.checkpointHits === 1) {
+      // full loop complete
+      racer.lap++;
+      racer.checkpointHits = 0;
+    }
+  }
+}
+
+/* ========== Camera: third-person follow with smoothing ========== */
+const camOffset = new THREE.Vector3(0, 6, -12); // behind car local space
+function updateCamera(dt) {
+  // desired camera position (relative to player)
+  const forward = new THREE.Vector3(Math.sin(player.heading), 0, Math.cos(player.heading));
+  const desired = player.position.clone()
+                  .add(new THREE.Vector3(
+                    -forward.x * 12 * 0.9,
+                    6,
+                    -forward.z * 12 * 0.9
+                  ));
+  // lerp camera
+  camera.position.lerp(desired, 0.08);
+  // look slightly ahead
+  const lookAt = player.position.clone().add(forward.multiplyScalar(8));
+  camera.lookAt(lookAt);
+}
+
+/* ========== Mini-map (2D top-down rendering of track & racers) ========== */
+const miniCanvas = document.getElementById('mini');
+miniCanvas.width = 360; miniCanvas.height = 240;
+const miniCtx = miniCanvas.getContext('2d');
+function renderMini() {
+  const w = miniCanvas.width, h = miniCanvas.height;
+  miniCtx.fillStyle = 'rgba(8,12,16,0.7)'; miniCtx.fillRect(0,0,w,h);
+  // transform world coords into mini coords: center at (0,0) equals track center
+  const scale = 0.34;
+  const cx = w/2, cy = h/2;
+  // draw track centerline
+  miniCtx.strokeStyle = '#6ec8ff'; miniCtx.lineWidth = 2;
+  miniCtx.beginPath();
+  for (let i=0;i<trackPoints.length;i++) {
+    const p = trackPoints[i];
+    const x = cx + p.x*scale, y = cy + p.z*scale;
+    if (i===0) miniCtx.moveTo(x,y); else miniCtx.lineTo(x,y);
+  }
+  miniCtx.closePath(); miniCtx.stroke();
+  // racers
+  function drawR(r, col) {
+    miniCtx.fillStyle = col;
+    const x = cx + r.position.x*scale, y = cy + r.position.z*scale;
+    miniCtx.beginPath(); miniCtx.ellipse(x,y,6,4, -r.heading, 0, Math.PI*2); miniCtx.fill();
+  }
+  drawR(player, '#ff5656');
+  aiRacers.forEach(a => drawR(a, '#7fe7ff'));
+}
+
+/* ========== HUD Updates ========== */
+const speedEl = document.getElementById('speed');
+const lapEl = document.getElementById('lap');
+const posEl = document.getElementById('racePos');
+const startMsg = document.getElementById('startMsg');
+
+/* ========== Main Loop ========== */
+let last = performance.now();
+function animate(now) {
+  const dt = Math.min(0.05, (now - last)/1000);
+  last = now;
+
+  // player controls -> update player.steer and player.velocity
+  // accelerate / brake
+  const forwardKey = keys['w'] || keys['arrowup'];
+  const backKey = keys['s'] || keys['arrowdown'];
+  const leftKey = keys['a'] || keys['arrowleft'];
+  const rightKey = keys['d'] || keys['arrowright'];
+  const handbrake = keys[' '];
+
+  // throttle
+  if (forwardKey) {
+    player.velocity += player.acc * dt * 1.2;
+  } else if (backKey) {
+    player.velocity -= player.brakePower * dt * 0.9;
+  } else {
+    // gentle rolling friction (handled in step)
+  }
+  // clamp velocity
+  player.velocity = Math.max(-player.maxSpeed*0.4, Math.min(player.maxSpeed, player.velocity));
+
+  // steering: modify steer value toward target
+  const steerTarget = (leftKey ? -1 : 0) + (rightKey ? 1 : 0);
+  player.steer += (steerTarget - player.steer) * Math.min(1, CONFIG.steerSpeed * dt);
+
+  // handbrake resets orientation slightly and reduces speed
+  if (handbrake) {
+    player.velocity *= 0.94;
+    // optional: spin
+    // player.heading += 0.4*dt;
+  }
+
+  // update player
+  player.step(dt);
+
+  // keep player on track height (sample curve nearest point y)
+  const ni = nearestTrackIndex(player.position);
+  player.position.y = trackPoints[ni].y + 1.2;
+
+  // AI step
+  aiRacers.forEach(ai => {
+    aiStep(ai, dt);
+    // align to track height
+    const n = nearestTrackIndex(ai.position);
+    ai.position.y = trackPoints[n].y + 1.2;
+    // lap detection for AI
+    updateLapAndPosition(ai);
+  });
+
+  // lap & position updates for player
+  updateLapAndPosition(player);
+
+  // camera
+  updateCamera(dt);
+
+  // HUD
+  speedEl.innerText = `Speed: ${Math.round(player.velocity * 3.6) } km/h`;
+  lapEl.innerText = `Lap: ${player.lap} / ${CONFIG.lapsToComplete}`;
+  // race position (simple: compare lap then nearest waypoint)
+  const racers = [player].concat(aiRacers);
+  racers.sort((a,b) => (b.lap - a.lap) || (nearestTrackIndex(b.position) - nearestTrackIndex(a.position)));
+  const pos = racers.indexOf(player) + 1;
+  posEl.innerText = `Position: ${pos} / ${racers.length}`;
+
+  // mini-map
+  renderMini();
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+/* ========== Initial small polish ========== */
+// add some distant city-like boxes for depth
+for (let i=0;i<50;i++) {
+  const box = new THREE.Mesh(new THREE.BoxGeometry(30, 40 + Math.random()*160, 30),
+    new THREE.MeshStandardMaterial({ color: 0x203a4a, roughness: 0.85 }));
+  box.position.set((Math.random()-0.5)*1800, (box.geometry.parameters.height)/2 - 10, (Math.random()-0.5)*1800);
+  box.receiveShadow = true;
+  scene.add(box);
+}
+
+// little ambient movement to make scene feel alive
+(function idleParticles() {
+  const g = new THREE.BufferGeometry();
+  const n = 2000;
+  const pos = new Float32Array(n*3);
+  for (let i=0;i<n;i++) {
+    pos[i*3] = (Math.random()-0.5)*2000;
+    pos[i*3+1] = Math.random()*80;
+    pos[i*3+2] = (Math.random()-0.5)*2000;
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const p = new THREE.Points(g, new THREE.PointsMaterial({ size: 2, transparent: true, opacity: 0.04 }));
+  scene.add(p);
+})();
+
+/* ========== Start Hint Listener ======= */
+window.addEventListener('click', () => startMsg.style.display = 'none');
+window.addEventListener('keydown', () => startMsg.style.display = 'none');
+
+</script>
+</body>
+</html>
